@@ -3,6 +3,8 @@ Click the black tiles when they appear.
 
 Game made with Bevy game engine.
 
+![Screenshot](assets/screenshot.png)
+
 # Running program
 Run optimised program.
 ```bash
