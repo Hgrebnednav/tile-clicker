@@ -49,6 +49,7 @@ impl Plugin for GamePlugin {
             .add_plugins(input_plugin)
             .add_event::<FinishedEvent>()
             .add_event::<SpawnNewEvent>()
+            .add_event::<SoundEvent>()
             .insert_resource(Msaa::Off)
             .add_systems(OnEnter(GameState::Game), setup_game)
             .add_systems(OnEnter(RunningState::Running), setup_session)
@@ -68,6 +69,7 @@ impl Plugin for GamePlugin {
                     update_score,
                     tile_spawn_timer,
                     update_tile_points,
+                    play_sound,
                 )
                     .run_if(in_state(RunningState::Running)),
             )
@@ -116,6 +118,12 @@ enum FinishedEvent {
 enum SpawnNewEvent {
     Normal,
     Error((u32, u32)),
+}
+
+#[derive(Debug, Event)]
+enum SoundEvent {
+    Normal,
+    Error,
 }
 
 #[derive(Debug, Default, Component)]
@@ -435,9 +443,10 @@ fn click(
     mut finished: EventWriter<FinishedEvent>,
     mut score: ResMut<Score>,
     mut new_tile: EventWriter<SpawnNewEvent>,
+    mut sound: EventWriter<SoundEvent>,
 ) {
     for event in clicks.read() {
-        info!("Clicked: {:?}", event);
+        // info!("Clicked: {:?}", event);
         let x = (event.tile_x as usize).min(TILE_NUM_X - 1);
         let y = (event.tile_y as usize).min(TILE_NUM_Y - 1);
         if let Some((entity, s)) = tiles.take(x, y) {
@@ -445,10 +454,12 @@ fn click(
             score.0 += s;
             if tiles.filled_tiles() == 0 {
                 new_tile.send(SpawnNewEvent::Normal);
+                sound.send(SoundEvent::Normal);
             }
         } else {
             new_tile.send(SpawnNewEvent::Error((x as u32, y as u32)));
             finished.send(FinishedEvent::Lost);
+            sound.send(SoundEvent::Error);
         }
     }
 }
@@ -467,6 +478,28 @@ fn update_score(mut q: Query<&mut Text, With<ScoreText>>, score: Res<Score>, tim
         (GAME_DURATION - time.0.elapsed_secs()).max(0.0)
     )
     .unwrap();
+}
+
+fn play_sound(
+    mut commands: Commands,
+    audio_assets: Res<AssetServer>,
+    mut events: EventReader<SoundEvent>,
+) {
+    for sound in events.read() {
+        let audio = match sound {
+            SoundEvent::Normal => audio_assets.load("test.wav"),
+            SoundEvent::Error => audio_assets.load("test2.wav"),
+        };
+        commands.spawn(AudioBundle {
+            source: audio,
+            settings: PlaybackSettings::DESPAWN,
+        });
+        // commands.spawn(PitchBundle {
+        //     source: pitch_assets.add(Pitch::new(f, Duration::new(0,200_000_000))),
+        //     settings: PlaybackSettings::DESPAWN,
+        // });
+        info!("Playing sound");
+    }
 }
 
 fn check_finished(

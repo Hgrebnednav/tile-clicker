@@ -26,6 +26,7 @@ features = [
 	"x11",
 	"tonemapping_luts",
 	"default_font",
+	"wav",
 	"webgl2",
 ]
 
