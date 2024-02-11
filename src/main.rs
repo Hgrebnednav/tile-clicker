@@ -10,8 +10,11 @@ fn main() {
         .add_plugins(
             DefaultPlugins.set(WindowPlugin {
                 primary_window: Some(Window {
+                    title: "Tile Clicker".to_owned(),
                     resolution: WindowResolution::new(FIELD_SIZE_X, FIELD_SIZE_Y + SCORE_HEIGHT)
                         .with_scale_factor_override(1.0),
+                    resizable: false,
+                    canvas: Some("#tile-clicker-canvas".into()),
                     ..default()
                 }),
                 ..default()

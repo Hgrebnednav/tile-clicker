@@ -8,7 +8,7 @@ pub const TILE_NUM_X: usize = 5;
 pub const TILE_NUM_Y: usize = TILE_NUM_X;
 pub const TILE_SIZE_X: f32 = FIELD_SIZE_X / TILE_NUM_X as f32;
 pub const TILE_SIZE_Y: f32 = FIELD_SIZE_Y / TILE_NUM_Y as f32;
-pub const BASE_DELAY: f32 = 1.2;
+pub const BASE_DELAY: f32 = 0.8;
 /// Total time in seconds the game lasts
 pub const GAME_DURATION: f32 = 30.0;
 
@@ -19,7 +19,6 @@ use input::ClickEvent;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum GameState {
-    Loading,
     #[default]
     Menu,
     Game,
@@ -40,7 +39,7 @@ impl Plugin for GamePlugin {
         let top_left = Vec2::new(0.0, SCORE_HEIGHT);
         let bottom_right = Vec2::new(FIELD_SIZE_X, FIELD_SIZE_Y + SCORE_HEIGHT);
         let input_plugin = input::InputPlugin::new(
-            GameState::Game,
+            RunningState::Running,
             UVec2::new(TILE_NUM_X as u32, TILE_NUM_Y as u32),
             top_left,
             bottom_right,
@@ -51,12 +50,13 @@ impl Plugin for GamePlugin {
             .add_event::<FinishedEvent>()
             .add_event::<SpawnNewEvent>()
             .insert_resource(Msaa::Off)
-            .add_systems(OnEnter(GameState::Game), setup)
+            .add_systems(OnEnter(GameState::Game), setup_game)
+            .add_systems(OnEnter(RunningState::Running), setup_session)
             .add_systems(
                 PreUpdate,
                 update_game_time.run_if(in_state(RunningState::Running)),
             )
-            .add_systems(Update, (check_finished).run_if(in_state(GameState::Game)))
+            .add_systems(Update, (check_finished).run_if(in_state(RunningState::Running)))
             .add_systems(
                 Update,
                 (
@@ -66,19 +66,19 @@ impl Plugin for GamePlugin {
                     tile_spawn_timer,
                     update_tile_points,
                 )
-                    .run_if(in_state(GameState::Game))
                     .run_if(in_state(RunningState::Running))
-                    .run_if(not(in_state(GameState::Menu))),
             )
             .add_systems(
                 OnExit(GameState::Game),
-                (despawn_screen::<OnGameScreen>, cleanup),
+                (despawn_screen::<OnGameScreen>, despawn_screen::<OnSessionScreen>, cleanup),
             )
             .add_systems(OnEnter(RunningState::Finished), setup_menu)
             .add_systems(
                 Update,
                 button_system.run_if(in_state(RunningState::Finished)),
-            );
+            )
+            .add_systems(OnExit(RunningState::Finished), (despawn_screen::<OnSessionScreen>, cleanup_session))
+        ;
     }
 }
 
@@ -103,8 +103,11 @@ enum SpawnNewEvent {
     Error((u32, u32)),
 }
 
-#[derive(Debug, Component)]
+#[derive(Debug, Default, Component)]
 struct OnGameScreen;
+
+#[derive(Debug, Default, Component)]
+struct OnSessionScreen;
 
 #[derive(Debug, Component)]
 struct ScoreText;
@@ -116,7 +119,7 @@ enum Button {
 }
 
 impl Button {
-    const ALL: &'static [Self] = &[Self::Menu];
+    const ALL: &'static [Self] = &[Self::Menu, Self::Restart];
 }
 
 type GameGrid = Grid<TILE_NUM_X, TILE_NUM_Y>;
@@ -162,7 +165,7 @@ impl<const X: usize, const Y: usize> Grid<X, Y> {
     fn take(&mut self, x: usize, y: usize) -> Option<(Entity, usize)> {
         let x = x.min(X - 1);
         let y = y.min(Y - 1);
-        let score = |t: Timer| t.remaining_secs().trunc() as usize * 2;
+        let score = |t: Timer| (t.remaining_secs() * 2.0).trunc() as usize;
         self.tiles[y][x].take().map(|(e, t)| (e, score(t)))
     }
 
@@ -199,25 +202,18 @@ impl<const X: usize, const Y: usize> Grid<X, Y> {
     }
 }
 
-fn setup(
+fn setup_game(
     mut commands: Commands,
     assets: Res<AssetServer>,
     mut state: ResMut<NextState<RunningState>>,
 ) {
-    info!("Setup Game {:?}", *state);
+    info!("Setup Gam");
     commands.spawn((Camera2dBundle::default(), OnGameScreen));
-    commands.insert_resource(GameGrid::new());
-    commands.insert_resource(GameTime(Stopwatch::new()));
-    commands.insert_resource(Score(0));
-    commands.insert_resource(SpawnTimer(Timer::from_seconds(
-        BASE_DELAY,
-        TimerMode::Repeating,
-    )));
 
     // Fill field with tile pattern
     for y in 0..TILE_NUM_Y {
         for x in 0..TILE_NUM_X {
-            tile(
+            tile::<OnGameScreen>(
                 &mut commands,
                 UVec2::new(x as u32, y as u32),
                 Color::rgb(0.8, 0.8, 0.8),
@@ -251,6 +247,22 @@ fn setup(
     state.set(RunningState::Running);
 }
 
+fn setup_session(
+    mut commands: Commands,
+    mut time: ResMut<Time<Virtual>>,
+) {
+    info!("Setup Session");
+    commands.insert_resource(GameGrid::new());
+    commands.insert_resource(GameTime(Stopwatch::new()));
+    commands.insert_resource(Score(0));
+    commands.insert_resource(SpawnTimer(Timer::from_seconds(
+        BASE_DELAY,
+        TimerMode::Repeating,
+    )));
+    time.unpause();
+    time.set_relative_speed(1.0);
+}
+
 fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
     commands
         .spawn(NodeBundle {
@@ -265,6 +277,7 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
             background_color: Color::NONE.into(),
             ..default()
         })
+        .insert(OnSessionScreen)
         .insert(OnGameScreen)
         .with_children(|parent| {
             // Add button per puzzle in config
@@ -286,6 +299,7 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
                     })
                     .insert(*button)
                     .insert(OnGameScreen)
+                    .insert(OnSessionScreen)
                     .with_children(|parent| {
                         parent
                             .spawn(TextBundle::from_section(
@@ -296,6 +310,7 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
                                     color: Color::rgb(0.9, 0.9, 0.9),
                                 },
                             ))
+                            .insert(OnSessionScreen)
                             .insert(OnGameScreen);
                     });
             }
@@ -307,7 +322,11 @@ fn cleanup(mut state: ResMut<NextState<RunningState>>, mut clicks: EventReader<C
     clicks.clear();
 }
 
-fn tile(commands: &mut Commands, pos: UVec2, color: Color) -> Entity {
+fn cleanup_session(mut clicks: EventReader<ClickEvent>) {
+    clicks.clear();
+}
+
+fn tile<S: Default + Component>(commands: &mut Commands, pos: UVec2, color: Color) -> Entity {
     let x = -(FIELD_SIZE_X - TILE_SIZE_X) / 2.0 + pos.x as f32 * TILE_SIZE_X;
     let y = -(FIELD_SIZE_Y - TILE_SIZE_Y) / 2.0 + pos.y as f32 * TILE_SIZE_Y;
     let y = -y - SCORE_HEIGHT / 2.0;
@@ -323,7 +342,7 @@ fn tile(commands: &mut Commands, pos: UVec2, color: Color) -> Entity {
                 transform: Transform::from_translation(translation),
                 ..default()
             },
-            OnGameScreen,
+            <S as Default>::default(),
         ))
         .id()
 }
@@ -358,7 +377,7 @@ fn spawn_tile(
                     let x = rng.gen_range(0..TILE_NUM_X);
                     let y = rng.gen_range(0..TILE_NUM_Y);
                     if tiles[[x, y]].is_none() {
-                        let entity = tile(&mut commands, UVec2::new(x as u32, y as u32), color);
+                        let entity = tile::<OnSessionScreen>(&mut commands, UVec2::new(x as u32, y as u32), color);
                         //info!("Spawned tile at {x}, {y}");
                         tiles.set(x, y, entity);
                         timer.0.reset();
@@ -367,7 +386,7 @@ fn spawn_tile(
                 }
             }
             SpawnNewEvent::Error((x, y)) => {
-                tile(&mut commands, UVec2::new(*x, *y), color);
+                tile::<OnSessionScreen>(&mut commands, UVec2::new(*x, *y), color);
             },
         }
     }
@@ -443,7 +462,8 @@ fn update_game_time(
     spawn_time.0.tick(time.delta());
     time.set_relative_speed(1.0 + stopwatch.0.elapsed_secs() / GAME_DURATION);
     if stopwatch.0.elapsed_secs() > GAME_DURATION {
-        time.pause();
+        info!("Time {} elapsed, finished", stopwatch.0.elapsed_secs());
+        //time.pause();
         events.send(FinishedEvent::Finished);
     }
 }
@@ -463,7 +483,6 @@ fn button_system(
                 info!("Entry selected: {:?}", button);
                 match button {
                     Button::Restart => {
-                        game_state.set(GameState::Game);
                         running_state.set(RunningState::Running);
                     }
                     Button::Menu => game_state.set(GameState::Menu),

@@ -8,8 +8,26 @@ authors = ["Thomas Vandenbergh <thomas@hgrebnednav.be>"]
 
 [dependencies]
 # bevy = { version = "0.12", features = ["dynamic_linking"] }
-bevy = { version = "0.12.1", features = [] }
+# bevy = { version = "0.12.1", default-features = false, features = [""] }
 rand = "0.8.5"
+[dependencies.bevy]
+version = "0.12.1"
+default-features = false
+features = [
+	"bevy_asset",
+	"bevy_audio",
+	"bevy_winit",
+	"bevy_core_pipeline",
+	"bevy_render",
+	"bevy_sprite",
+	"bevy_text",
+	"bevy_ui",
+	"multi-threaded",
+	"x11",
+	"tonemapping_luts",
+	"default_font",
+	"webgl2",
+]
 
 [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
 version = "0.3"
