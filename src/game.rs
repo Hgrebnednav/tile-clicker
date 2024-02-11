@@ -13,13 +13,17 @@ pub const BASE_DELAY: f32 = 0.8;
 pub const GAME_DURATION: f32 = 30.0;
 
 mod input;
+mod loading;
+
 use crate::despawn_screen;
 use crate::main_menu::{HOVERED_BUTTON, NORMAL_BUTTON, PRESSED_BUTTON};
 use input::ClickEvent;
+pub use loading::{Assets, LoadingPlugin};
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 pub enum GameState {
     #[default]
+    Loading,
     Menu,
     Game,
 }
@@ -227,7 +231,7 @@ impl<const X: usize, const Y: usize> Grid<X, Y> {
 
 fn setup_game(
     mut commands: Commands,
-    assets: Res<AssetServer>,
+    assets: Res<Assets>,
     mut state: ResMut<NextState<RunningState>>,
 ) {
     info!("Setup Gam");
@@ -243,7 +247,7 @@ fn setup_game(
             );
         }
     }
-    let font: Handle<Font> = assets.load("fonts/EBGaramond-Bold.ttf");
+    let font: Handle<Font> = assets.font.clone();
     fn text_section(s: &str, font: Handle<Font>) -> TextSection {
         TextSection {
             value: s.into(),
@@ -480,15 +484,11 @@ fn update_score(mut q: Query<&mut Text, With<ScoreText>>, score: Res<Score>, tim
     .unwrap();
 }
 
-fn play_sound(
-    mut commands: Commands,
-    audio_assets: Res<AssetServer>,
-    mut events: EventReader<SoundEvent>,
-) {
+fn play_sound(mut commands: Commands, assets: Res<Assets>, mut events: EventReader<SoundEvent>) {
     for sound in events.read() {
         let audio = match sound {
-            SoundEvent::Normal => audio_assets.load("test.wav"),
-            SoundEvent::Error => audio_assets.load("test2.wav"),
+            SoundEvent::Normal => assets.hit.clone(),
+            SoundEvent::Error => assets.error.clone(),
         };
         commands.spawn(AudioBundle {
             source: audio,

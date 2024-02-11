@@ -20,6 +20,7 @@ fn main() {
                 ..default()
             }),
         )
+        .add_plugins(game::LoadingPlugin)
         .add_plugins(main_menu::MainMenuPlugin)
         .add_plugins(game::GamePlugin)
         .run()
