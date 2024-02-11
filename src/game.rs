@@ -103,6 +103,9 @@ struct MenuActiveDelay(Timer);
 #[derive(Debug, Default, Resource)]
 struct Score(usize);
 
+#[derive(Debug, Default, Resource)]
+struct LastSpawn(UVec2);
+
 #[derive(Debug, Event)]
 enum FinishedEvent {
     Lost,
@@ -227,7 +230,7 @@ fn setup_game(
         for x in 0..TILE_NUM_X {
             tile::<OnGameScreen>(
                 &mut commands,
-                UVec2::new(x as u32, y as u32),
+                UVec3::new(x as u32, y as u32, 0),
                 Color::rgb(0.8, 0.8, 0.8),
             );
         }
@@ -264,6 +267,7 @@ fn setup_session(mut commands: Commands, mut time: ResMut<Time<Virtual>>) {
     commands.insert_resource(GameGrid::new());
     commands.insert_resource(GameTime(Stopwatch::new()));
     commands.insert_resource(Score(0));
+    commands.insert_resource(LastSpawn(UVec2::default()));
     commands.insert_resource(SpawnTimer(Timer::from_seconds(
         BASE_DELAY,
         TimerMode::Repeating,
@@ -336,11 +340,11 @@ fn cleanup_session(mut clicks: EventReader<ClickEvent>) {
     clicks.clear();
 }
 
-fn tile<S: Default + Component>(commands: &mut Commands, pos: UVec2, color: Color) -> Entity {
+fn tile<S: Default + Component>(commands: &mut Commands, pos: UVec3, color: Color) -> Entity {
     let x = -(FIELD_SIZE_X - TILE_SIZE_X) / 2.0 + pos.x as f32 * TILE_SIZE_X;
     let y = -(FIELD_SIZE_Y - TILE_SIZE_Y) / 2.0 + pos.y as f32 * TILE_SIZE_Y;
     let y = -y - SCORE_HEIGHT / 2.0;
-    let translation = Vec3::new(x, y, 0.0);
+    let translation = Vec3::new(x, y, pos.z as f32);
     commands
         .spawn((
             SpriteBundle {
@@ -368,8 +372,10 @@ fn spawn_tile(
     mut tiles: ResMut<GameGrid>,
     mut events: EventReader<SpawnNewEvent>,
     mut timer: ResMut<SpawnTimer>,
+    mut last_spawn: ResMut<LastSpawn>,
 ) {
     use rand::{thread_rng, Rng};
+    const SPAWN_DISTANCE: isize = 2;
     for e in events.read().take(1) {
         let mut rng = thread_rng();
 
@@ -386,13 +392,24 @@ fn spawn_tile(
                     }
                     let x = rng.gen_range(0..TILE_NUM_X);
                     let y = rng.gen_range(0..TILE_NUM_Y);
+                    let dx = x as isize - last_spawn.0.x as isize;
+                    let dy = y as isize - last_spawn.0.y as isize;
+                    let dx = dx.abs().min(SPAWN_DISTANCE) * dx.signum();
+                    let dy = dy.abs().min(SPAWN_DISTANCE) * dy.signum();
+                    let x = (last_spawn.0.x as usize)
+                        .saturating_add_signed(dx)
+                        .min(TILE_NUM_X - 1);
+                    let y = (last_spawn.0.y as usize)
+                        .saturating_add_signed(dy)
+                        .min(TILE_NUM_Y - 1);
+                    let pos = UVec2::new(x as u32, y as u32);
+                    if pos == last_spawn.0 {
+                        continue;
+                    }
                     if tiles[[x, y]].is_none() {
-                        let entity = tile::<OnSessionScreen>(
-                            &mut commands,
-                            UVec2::new(x as u32, y as u32),
-                            color,
-                        );
+                        let entity = tile::<OnSessionScreen>(&mut commands, pos.extend(1), color);
                         //info!("Spawned tile at {x}, {y}");
+                        last_spawn.0 = pos;
                         tiles.set(x, y, entity);
                         timer.0.reset();
                         break;
@@ -400,7 +417,7 @@ fn spawn_tile(
                 }
             }
             SpawnNewEvent::Error((x, y)) => {
-                tile::<OnSessionScreen>(&mut commands, UVec2::new(*x, *y), color);
+                tile::<OnSessionScreen>(&mut commands, UVec3::new(*x, *y, 2), color);
             }
         }
     }
