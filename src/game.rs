@@ -97,6 +97,9 @@ struct GameTime(Stopwatch);
 #[derive(Debug, Resource)]
 struct SpawnTimer(Timer);
 
+#[derive(Debug, Resource)]
+struct MenuActiveDelay(Timer);
+
 #[derive(Debug, Default, Resource)]
 struct Score(usize);
 
@@ -270,6 +273,7 @@ fn setup_session(mut commands: Commands, mut time: ResMut<Time<Virtual>>) {
 }
 
 fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
+    commands.insert_resource(MenuActiveDelay(Timer::from_seconds(0.8, TimerMode::Once)));
     commands
         .spawn(NodeBundle {
             style: Style {
@@ -485,7 +489,13 @@ fn button_system(
     >,
     mut game_state: ResMut<NextState<GameState>>,
     mut running_state: ResMut<NextState<RunningState>>,
+    mut delay: ResMut<MenuActiveDelay>,
+    time: ResMut<Time<Real>>,
 ) {
+    delay.0.tick(time.delta());
+    if !delay.0.finished() {
+        return;
+    }
     for (interaction, mut color, button) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
