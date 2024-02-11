@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <style>
+        body {
+            background: linear-gradient(135deg,
+                    white 0%,
+                    white 49%,
+                    black 49%,
+                    black 51%,
+                    white 51%,
+                    white 100%) repeat;
+            background-size: 20px 20px;
+        }
+
+        canvas {
+            background-color: white;
+            padding-left: 0;
+            padding-right: 0;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+    </style>
+    <title>Tile Clicker</title>
+</head>
+<body style="margin: 0px;">
+    <canvas id="tile-clicker-canvas" width="1280" height="720"></canvas>
+    <script type="module">
+        import init from './target/tile_clicker.js'
+
+        init().catch((error) => {
+            if (!error.message.startsWith("Using exceptions for control flow, don't mind me. This isn't actually an error!")) {
+                throw error;
+            }
+        });
+    </script>
+</body>
+</html>
