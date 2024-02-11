@@ -56,7 +56,10 @@ impl Plugin for GamePlugin {
                 PreUpdate,
                 update_game_time.run_if(in_state(RunningState::Running)),
             )
-            .add_systems(Update, (check_finished).run_if(in_state(RunningState::Running)))
+            .add_systems(
+                Update,
+                (check_finished).run_if(in_state(RunningState::Running)),
+            )
             .add_systems(
                 Update,
                 (
@@ -66,19 +69,25 @@ impl Plugin for GamePlugin {
                     tile_spawn_timer,
                     update_tile_points,
                 )
-                    .run_if(in_state(RunningState::Running))
+                    .run_if(in_state(RunningState::Running)),
             )
             .add_systems(
                 OnExit(GameState::Game),
-                (despawn_screen::<OnGameScreen>, despawn_screen::<OnSessionScreen>, cleanup),
+                (
+                    despawn_screen::<OnGameScreen>,
+                    despawn_screen::<OnSessionScreen>,
+                    cleanup,
+                ),
             )
             .add_systems(OnEnter(RunningState::Finished), setup_menu)
             .add_systems(
                 Update,
                 button_system.run_if(in_state(RunningState::Finished)),
             )
-            .add_systems(OnExit(RunningState::Finished), (despawn_screen::<OnSessionScreen>, cleanup_session))
-        ;
+            .add_systems(
+                OnExit(RunningState::Finished),
+                (despawn_screen::<OnSessionScreen>, cleanup_session),
+            );
     }
 }
 
@@ -247,10 +256,7 @@ fn setup_game(
     state.set(RunningState::Running);
 }
 
-fn setup_session(
-    mut commands: Commands,
-    mut time: ResMut<Time<Virtual>>,
-) {
+fn setup_session(mut commands: Commands, mut time: ResMut<Time<Virtual>>) {
     info!("Setup Session");
     commands.insert_resource(GameGrid::new());
     commands.insert_resource(GameTime(Stopwatch::new()));
@@ -377,7 +383,11 @@ fn spawn_tile(
                     let x = rng.gen_range(0..TILE_NUM_X);
                     let y = rng.gen_range(0..TILE_NUM_Y);
                     if tiles[[x, y]].is_none() {
-                        let entity = tile::<OnSessionScreen>(&mut commands, UVec2::new(x as u32, y as u32), color);
+                        let entity = tile::<OnSessionScreen>(
+                            &mut commands,
+                            UVec2::new(x as u32, y as u32),
+                            color,
+                        );
                         //info!("Spawned tile at {x}, {y}");
                         tiles.set(x, y, entity);
                         timer.0.reset();
@@ -387,7 +397,7 @@ fn spawn_tile(
             }
             SpawnNewEvent::Error((x, y)) => {
                 tile::<OnSessionScreen>(&mut commands, UVec2::new(*x, *y), color);
-            },
+            }
         }
     }
     events.clear();
