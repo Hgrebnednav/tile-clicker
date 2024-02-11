@@ -14,6 +14,7 @@ pub const GAME_DURATION: f32 = 30.0;
 
 mod input;
 use crate::despawn_screen;
+use crate::main_menu::{HOVERED_BUTTON, NORMAL_BUTTON, PRESSED_BUTTON};
 use input::ClickEvent;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
@@ -50,13 +51,6 @@ impl Plugin for GamePlugin {
             .add_event::<FinishedEvent>()
             .add_event::<SpawnNewEvent>()
             .insert_resource(Msaa::Off)
-            .insert_resource(GameGrid::new())
-            .insert_resource(GameTime(Stopwatch::new()))
-            .insert_resource(Score(0))
-            .insert_resource(SpawnTimer(Timer::from_seconds(
-                BASE_DELAY,
-                TimerMode::Repeating,
-            )))
             .add_systems(OnEnter(GameState::Game), setup)
             .add_systems(
                 PreUpdate,
@@ -79,6 +73,11 @@ impl Plugin for GamePlugin {
             .add_systems(
                 OnExit(GameState::Game),
                 (despawn_screen::<OnGameScreen>, cleanup),
+            )
+            .add_systems(OnEnter(RunningState::Finished), setup_menu)
+            .add_systems(
+                Update,
+                button_system.run_if(in_state(RunningState::Finished)),
             );
     }
 }
@@ -101,7 +100,7 @@ enum FinishedEvent {
 #[derive(Debug, Event)]
 enum SpawnNewEvent {
     Normal,
-    Error,
+    Error((u32, u32)),
 }
 
 #[derive(Debug, Component)]
@@ -109,6 +108,16 @@ struct OnGameScreen;
 
 #[derive(Debug, Component)]
 struct ScoreText;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Component)]
+enum Button {
+    Menu,
+    Restart,
+}
+
+impl Button {
+    const ALL: &'static [Self] = &[Self::Menu];
+}
 
 type GameGrid = Grid<TILE_NUM_X, TILE_NUM_Y>;
 
@@ -184,6 +193,10 @@ impl<const X: usize, const Y: usize> Grid<X, Y> {
             .filter(|tile| tile.is_none())
             .count()
     }
+
+    fn filled_tiles(&self) -> usize {
+        (X * Y) - self.free_tiles()
+    }
 }
 
 fn setup(
@@ -191,8 +204,15 @@ fn setup(
     assets: Res<AssetServer>,
     mut state: ResMut<NextState<RunningState>>,
 ) {
-    info!("Setup Game");
-    commands.spawn(Camera2dBundle::default());
+    info!("Setup Game {:?}", *state);
+    commands.spawn((Camera2dBundle::default(), OnGameScreen));
+    commands.insert_resource(GameGrid::new());
+    commands.insert_resource(GameTime(Stopwatch::new()));
+    commands.insert_resource(Score(0));
+    commands.insert_resource(SpawnTimer(Timer::from_seconds(
+        BASE_DELAY,
+        TimerMode::Repeating,
+    )));
 
     // Fill field with tile pattern
     for y in 0..TILE_NUM_Y {
@@ -231,8 +251,60 @@ fn setup(
     state.set(RunningState::Running);
 }
 
-fn cleanup(mut state: ResMut<NextState<RunningState>>) {
+fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
+    commands
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Percent(90.0),
+                padding: UiRect::new(Val::Auto, Val::Auto, Val::Px(10.0), Val::Px(10.0)),
+                justify_content: JustifyContent::Center,
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            background_color: Color::NONE.into(),
+            ..default()
+        })
+        .insert(OnGameScreen)
+        .with_children(|parent| {
+            // Add button per puzzle in config
+            for (_i, button) in Button::ALL.iter().enumerate() {
+                parent
+                    .spawn(ButtonBundle {
+                        style: Style {
+                            width: Val::Percent(50.0),
+                            height: Val::Percent(15.0),
+                            margin: UiRect::new(Val::Auto, Val::Auto, Val::Px(10.0), Val::Px(10.0)),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            border: UiRect::all(Val::Px(2.0)),
+                            ..default()
+                        },
+                        background_color: Color::rgb(0.2, 0.2, 0.2).into(),
+                        border_color: Color::rgb(0.5, 0.2, 0.2).into(),
+                        ..default()
+                    })
+                    .insert(*button)
+                    .insert(OnGameScreen)
+                    .with_children(|parent| {
+                        parent
+                            .spawn(TextBundle::from_section(
+                                format!("{:?}", button),
+                                TextStyle {
+                                    font: assets.load("fonts/EBGaramond-Regular.ttf"),
+                                    font_size: 40.0,
+                                    color: Color::rgb(0.9, 0.9, 0.9),
+                                },
+                            ))
+                            .insert(OnGameScreen);
+                    });
+            }
+        });
+}
+
+fn cleanup(mut state: ResMut<NextState<RunningState>>, mut clicks: EventReader<ClickEvent>) {
     state.set(RunningState::Paused);
+    clicks.clear();
 }
 
 fn tile(commands: &mut Commands, pos: UVec2, color: Color) -> Entity {
@@ -274,22 +346,29 @@ fn spawn_tile(
 
         let color = match e {
             SpawnNewEvent::Normal => Color::rgb(0.1, 0.1, 0.1),
-            SpawnNewEvent::Error => Color::rgb(0.9, 0.1, 0.1),
+            SpawnNewEvent::Error(_) => Color::rgb(0.9, 0.1, 0.1),
         };
 
-        loop {
-            if tiles.is_full() {
-                break;
+        match e {
+            SpawnNewEvent::Normal => {
+                loop {
+                    if tiles.is_full() {
+                        break;
+                    }
+                    let x = rng.gen_range(0..TILE_NUM_X);
+                    let y = rng.gen_range(0..TILE_NUM_Y);
+                    if tiles[[x, y]].is_none() {
+                        let entity = tile(&mut commands, UVec2::new(x as u32, y as u32), color);
+                        //info!("Spawned tile at {x}, {y}");
+                        tiles.set(x, y, entity);
+                        timer.0.reset();
+                        break;
+                    }
+                }
             }
-            let x = rng.gen_range(0..TILE_NUM_X);
-            let y = rng.gen_range(0..TILE_NUM_Y);
-            if tiles[[x, y]].is_none() {
-                let entity = tile(&mut commands, UVec2::new(x as u32, y as u32), color);
-                //info!("Spawned tile at {x}, {y}");
-                tiles.set(x, y, entity);
-                timer.0.reset();
-                break;
-            }
+            SpawnNewEvent::Error((x, y)) => {
+                tile(&mut commands, UVec2::new(*x, *y), color);
+            },
         }
     }
     events.clear();
@@ -314,9 +393,11 @@ fn click(
         if let Some((entity, s)) = tiles.take(x, y) {
             commands.entity(entity).despawn_recursive();
             score.0 += s;
-            new_tile.send(SpawnNewEvent::Normal);
+            if tiles.filled_tiles() == 0 {
+                new_tile.send(SpawnNewEvent::Normal);
+            }
         } else {
-            new_tile.send(SpawnNewEvent::Error);
+            new_tile.send(SpawnNewEvent::Error((x as u32, y as u32)));
             finished.send(FinishedEvent::Lost);
         }
     }
@@ -364,5 +445,36 @@ fn update_game_time(
     if stopwatch.0.elapsed_secs() > GAME_DURATION {
         time.pause();
         events.send(FinishedEvent::Finished);
+    }
+}
+
+fn button_system(
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor, &Button),
+        (Changed<Interaction>, With<Button>),
+    >,
+    mut game_state: ResMut<NextState<GameState>>,
+    mut running_state: ResMut<NextState<RunningState>>,
+) {
+    for (interaction, mut color, button) in &mut interaction_query {
+        match *interaction {
+            Interaction::Pressed => {
+                *color = PRESSED_BUTTON.into();
+                info!("Entry selected: {:?}", button);
+                match button {
+                    Button::Restart => {
+                        game_state.set(GameState::Game);
+                        running_state.set(RunningState::Running);
+                    }
+                    Button::Menu => game_state.set(GameState::Menu),
+                }
+            }
+            Interaction::Hovered => {
+                *color = HOVERED_BUTTON.into();
+            }
+            Interaction::None => {
+                *color = NORMAL_BUTTON.into();
+            }
+        }
     }
 }

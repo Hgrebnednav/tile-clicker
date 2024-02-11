@@ -56,7 +56,7 @@ fn to_tile_pos(grid: &Grid, world_pos: Vec2) -> Option<ClickEvent> {
     // Shift position up such that all coordinates are positive and
     // the top region is negative
     let shifted = world_pos + field_size / 2.0 - Vec2::new(0.0, top_offset / 2.0);
-    let scaled = dbg!(shifted / tile_size);
+    let scaled = shifted / tile_size;
     if scaled.y >= grid.size.y as f32 || scaled.y < 0.0 {
         return None;
     }
@@ -101,7 +101,7 @@ fn handle_click_input(
         // Flip Y axis and reduce to 2d vector
         let world_pos = world_pos.truncate() * Vec2::new(1.0, -1.0);
 
-        if let Some(tile) = to_tile_pos(&settings, dbg!(world_pos)) {
+        if let Some(tile) = to_tile_pos(&settings, world_pos) {
             event.send(tile);
         }
     }
