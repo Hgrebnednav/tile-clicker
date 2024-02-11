@@ -46,6 +46,26 @@ pub struct ClickEvent {
     pub tile_y: u16,
 }
 
+fn to_tile_pos(grid: &Grid, world_pos: Vec2) -> Option<ClickEvent> {
+    let field_width = grid.field.1.x - grid.field.0.x;
+    let field_height = grid.field.1.y - grid.field.0.y;
+    let field_size = Vec2::new(field_width, field_height);
+    let tile_size = field_size / grid.size.as_vec2();
+    let top_offset = grid.field.0.y;
+
+    // Shift position up such that all coordinates are positive and
+    // the top region is negative
+    let shifted = world_pos + field_size / 2.0 - Vec2::new(0.0, top_offset / 2.0);
+    let scaled = dbg!(shifted / tile_size);
+    if scaled.y >= grid.size.y as f32 || scaled.y < 0.0 {
+        return None;
+    }
+    Some(ClickEvent {
+        tile_x: scaled.x.trunc() as u16,
+        tile_y: scaled.y.trunc() as u16,
+    })
+}
+
 fn handle_click_input(
     mouse_btn: Res<Input<MouseButton>>,
     windows: Query<&Window, With<PrimaryWindow>>,
@@ -60,9 +80,6 @@ fn handle_click_input(
         let Some(pos) = win.cursor_position() else {
             return;
         };
-        let field_width = settings.field.0.x - settings.field.1.x;
-        let field_height = settings.field.0.y - settings.field.1.y;
-        let top_offset = settings.field.0.y;
         let (camera, camera_transform) = q_camera.single();
 
         let width = win.width();
@@ -81,16 +98,11 @@ fn handle_click_input(
         // use it to convert ndc to world-space coordinates
         let world_pos = ndc_to_world.project_point3(ndc.extend(-1.0));
 
-        // reduce it to a 2D value
-        let world_pos: Vec2 =
-            world_pos.truncate() * Vec2::new(-1.0, 1.0) + Vec2::new(0.0, top_offset / 2.0);
+        // Flip Y axis and reduce to 2d vector
+        let world_pos = world_pos.truncate() * Vec2::new(1.0, -1.0);
 
-        let pos = world_pos + Vec2::new(field_width, field_height) / 2.0;
-        if pos.y < 0.0 {
-            let pos = pos / (Vec2::new(field_width, field_height) / settings.size.as_vec2());
-            let tile_x = pos[0].trunc() as u16;
-            let tile_y = pos[1].trunc() as u16;
-            event.send(ClickEvent { tile_x, tile_y })
+        if let Some(tile) = to_tile_pos(&settings, dbg!(world_pos)) {
+            event.send(tile);
         }
     }
 }
@@ -117,8 +129,6 @@ fn handle_touch_input(
 
         let (camera, camera_transform) = q_camera.single();
 
-        let field_width = settings.field.0.x - settings.field.1.x;
-        let field_height = settings.field.0.y - settings.field.1.y;
         let width = win.width();
         let height = win.height();
 
@@ -135,15 +145,11 @@ fn handle_touch_input(
         // use it to convert ndc to world-space coordinates
         let world_pos = ndc_to_world.project_point3(ndc.extend(-1.0));
 
-        // reduce it to a 2D value
-        let world_pos: Vec2 = world_pos.truncate() * Vec2::new(1.0, -1.0);
+        // Flip Y axis and reduce to 2d vector
+        let world_pos = world_pos.truncate() * Vec2::new(1.0, -1.0);
 
-        let pos = world_pos + Vec2::new(field_width, field_height) / 2.0;
-        if pos.y < 0.0 {
-            let pos = pos / (Vec2::new(field_width, field_height) / settings.size.as_vec2());
-            let tile_x = pos[0].trunc() as u16;
-            let tile_y = pos[1].trunc() as u16;
-            click_event.send(ClickEvent { tile_x, tile_y })
+        if let Some(tile) = to_tile_pos(&settings, dbg!(world_pos)) {
+            click_event.send(tile);
         }
     }
 }

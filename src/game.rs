@@ -99,7 +99,10 @@ enum FinishedEvent {
 }
 
 #[derive(Debug, Event)]
-struct SpawnNewEvent;
+enum SpawnNewEvent {
+    Normal,
+    Error,
+}
 
 #[derive(Debug, Component)]
 struct OnGameScreen;
@@ -234,8 +237,8 @@ fn cleanup(mut state: ResMut<NextState<RunningState>>) {
 
 fn tile(commands: &mut Commands, pos: UVec2, color: Color) -> Entity {
     let x = -(FIELD_SIZE_X - TILE_SIZE_X) / 2.0 + pos.x as f32 * TILE_SIZE_X;
-    let y = -FIELD_SIZE_Y / 2.0 + pos.y as f32 * TILE_SIZE_Y;
-    let y = -y - SCORE_HEIGHT;
+    let y = -(FIELD_SIZE_Y - TILE_SIZE_Y) / 2.0 + pos.y as f32 * TILE_SIZE_Y;
+    let y = -y - SCORE_HEIGHT / 2.0;
     let translation = Vec3::new(x, y, 0.0);
     commands
         .spawn((
@@ -255,7 +258,7 @@ fn tile(commands: &mut Commands, pos: UVec2, color: Color) -> Entity {
 
 fn tile_spawn_timer(timer: Res<SpawnTimer>, mut events: EventWriter<SpawnNewEvent>) {
     if timer.0.finished() {
-        events.send(SpawnNewEvent);
+        events.send(SpawnNewEvent::Normal);
     }
 }
 
@@ -266,8 +269,13 @@ fn spawn_tile(
     mut timer: ResMut<SpawnTimer>,
 ) {
     use rand::{thread_rng, Rng};
-    for _ in events.read().take(1) {
+    for e in events.read().take(1) {
         let mut rng = thread_rng();
+
+        let color = match e {
+            SpawnNewEvent::Normal => Color::rgb(0.1, 0.1, 0.1),
+            SpawnNewEvent::Error => Color::rgb(0.9, 0.1, 0.1),
+        };
 
         loop {
             if tiles.is_full() {
@@ -276,12 +284,8 @@ fn spawn_tile(
             let x = rng.gen_range(0..TILE_NUM_X);
             let y = rng.gen_range(0..TILE_NUM_Y);
             if tiles[[x, y]].is_none() {
-                let entity = tile(
-                    &mut commands,
-                    UVec2::new(x as u32, y as u32),
-                    Color::rgb(0.1, 0.1, 0.1),
-                );
-                info!("Spawned tile at {x}, {y}");
+                let entity = tile(&mut commands, UVec2::new(x as u32, y as u32), color);
+                //info!("Spawned tile at {x}, {y}");
                 tiles.set(x, y, entity);
                 timer.0.reset();
                 break;
@@ -310,8 +314,9 @@ fn click(
         if let Some((entity, s)) = tiles.take(x, y) {
             commands.entity(entity).despawn_recursive();
             score.0 += s;
-            new_tile.send(SpawnNewEvent);
+            new_tile.send(SpawnNewEvent::Normal);
         } else {
+            new_tile.send(SpawnNewEvent::Error);
             finished.send(FinishedEvent::Lost);
         }
     }
