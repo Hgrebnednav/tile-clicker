@@ -30,7 +30,9 @@ where
             .add_systems(
                 Update,
                 (handle_click_input, handle_touch_input).run_if(in_state(self.state)),
-            );
+            )
+            .add_systems(PreUpdate, update_time.run_if(in_state(self.state)))
+            .add_systems(OnEnter(self.state), setup);
     }
 }
 
@@ -44,6 +46,17 @@ struct Grid {
 pub struct ClickEvent {
     pub tile_x: u16,
     pub tile_y: u16,
+}
+
+#[derive(Debug, Resource)]
+struct ClickDelay(Timer);
+
+fn setup(mut commands: Commands) {
+    commands.insert_resource(ClickDelay(Timer::from_seconds(0.4, TimerMode::Once)));
+}
+
+fn update_time(time: Res<Time<Real>>, mut delay: ResMut<ClickDelay>) {
+    delay.0.tick(time.delta());
 }
 
 fn to_tile_pos(grid: &Grid, world_pos: Vec2) -> Option<ClickEvent> {
@@ -72,7 +85,11 @@ fn handle_click_input(
     q_camera: Query<(&Camera, &GlobalTransform)>,
     mut event: EventWriter<ClickEvent>,
     settings: Res<Grid>,
+    start_delay: Res<ClickDelay>,
 ) {
+    if !start_delay.0.finished() {
+        return;
+    }
     let Ok(win) = windows.get_single() else {
         panic!("No primary window found");
     };
@@ -113,7 +130,11 @@ fn handle_touch_input(
     q_camera: Query<(&Camera, &GlobalTransform)>,
     mut click_event: EventWriter<ClickEvent>,
     settings: Res<Grid>,
+    start_delay: Res<ClickDelay>,
 ) {
+    if !start_delay.0.finished() {
+        return;
+    }
     let Ok(win) = windows.get_single() else {
         panic!("No primary window found");
     };
