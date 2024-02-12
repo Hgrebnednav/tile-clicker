@@ -47,8 +47,7 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
         })
         .insert(OnMainMenu)
         .with_children(|parent| {
-            // Add button per puzzle in config
-            for (_i, button) in Button::ALL.iter().enumerate() {
+            for button in Button::ALL.iter() {
                 parent
                     .spawn(ButtonBundle {
                         style: Style {

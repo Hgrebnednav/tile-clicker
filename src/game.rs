@@ -68,12 +68,7 @@ impl Plugin for GamePlugin {
             )
             .add_systems(
                 Update,
-                (
-                    click,
-                    update_score,
-                    tile_spawn_timer,
-                    update_tile_points,
-                )
+                (click, update_score, tile_spawn_timer, update_tile_points)
                     .run_if(in_state(RunningState::Running)),
             )
             .add_systems(
@@ -182,12 +177,6 @@ impl<const X: usize, const Y: usize> Grid<X, Y> {
         self.tiles[y][x] = Some((entity, Timer::from_seconds(5.0, TimerMode::Once)));
     }
 
-    fn entity(&self, x: usize, y: usize) -> Option<Entity> {
-        let x = x.min(X - 1);
-        let y = y.min(Y - 1);
-        self.tiles[y][x].as_ref().map(|(e, _)| *e)
-    }
-
     fn take(&mut self, x: usize, y: usize) -> Option<(Entity, usize)> {
         let x = x.min(X - 1);
         let y = y.min(Y - 1);
@@ -196,18 +185,10 @@ impl<const X: usize, const Y: usize> Grid<X, Y> {
     }
 
     fn tick(&mut self, delta: bevy::utils::Duration) {
-        let iter = self.tiles.iter_mut().map(|row| row.iter_mut()).flatten();
+        let iter = self.tiles.iter_mut().flat_map(|row| row.iter_mut());
         for tile in iter {
             tile.as_mut().map(|(_, t)| t.tick(delta));
         }
-    }
-
-    const fn size_x(&self) -> usize {
-        X
-    }
-
-    const fn size_y(&self) -> usize {
-        Y
     }
 
     fn is_full(&self) -> bool {
@@ -217,8 +198,7 @@ impl<const X: usize, const Y: usize> Grid<X, Y> {
     fn free_tiles(&self) -> usize {
         self.tiles
             .iter()
-            .map(|row| row.iter())
-            .flatten()
+            .flat_map(|row| row.iter())
             .filter(|tile| tile.is_none())
             .count()
     }
@@ -305,8 +285,7 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
         .insert(OnSessionScreen)
         .insert(OnGameScreen)
         .with_children(|parent| {
-            // Add all buttons to menu
-            for (_i, button) in Button::ALL.iter().enumerate() {
+            for button in Button::ALL.iter() {
                 parent
                     .spawn(ButtonBundle {
                         style: Style {
@@ -527,6 +506,7 @@ fn update_game_time(
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn button_system(
     mut interaction_query: Query<
         (&Interaction, &mut BackgroundColor, &Button),
