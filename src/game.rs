@@ -57,23 +57,22 @@ impl Plugin for GamePlugin {
             .insert_resource(Msaa::Off)
             .add_systems(OnEnter(GameState::Game), setup_game)
             .add_systems(OnEnter(RunningState::Running), setup_session)
+            .add_systems(PostUpdate, play_sound.run_if(in_state(GameState::Game)))
             .add_systems(
                 PreUpdate,
                 update_game_time.run_if(in_state(RunningState::Running)),
             )
             .add_systems(
-                Update,
-                (check_finished).run_if(in_state(RunningState::Running)),
+                PostUpdate,
+                (check_finished, spawn_tile).run_if(in_state(RunningState::Running)),
             )
             .add_systems(
                 Update,
                 (
-                    spawn_tile,
                     click,
                     update_score,
                     tile_spawn_timer,
                     update_tile_points,
-                    play_sound,
                 )
                     .run_if(in_state(RunningState::Running)),
             )
@@ -306,7 +305,7 @@ fn setup_menu(mut commands: Commands, assets: Res<AssetServer>) {
         .insert(OnSessionScreen)
         .insert(OnGameScreen)
         .with_children(|parent| {
-            // Add button per puzzle in config
+            // Add all buttons to menu
             for (_i, button) in Button::ALL.iter().enumerate() {
                 parent
                     .spawn(ButtonBundle {
@@ -458,8 +457,8 @@ fn click(
             score.0 += s;
             if tiles.filled_tiles() == 0 {
                 new_tile.send(SpawnNewEvent::Normal);
-                sound.send(SoundEvent::Normal);
             }
+            sound.send(SoundEvent::Normal);
         } else {
             new_tile.send(SpawnNewEvent::Error((x as u32, y as u32)));
             finished.send(FinishedEvent::Lost);
@@ -494,10 +493,6 @@ fn play_sound(mut commands: Commands, assets: Res<Assets>, mut events: EventRead
             source: audio,
             settings: PlaybackSettings::DESPAWN,
         });
-        // commands.spawn(PitchBundle {
-        //     source: pitch_assets.add(Pitch::new(f, Duration::new(0,200_000_000))),
-        //     settings: PlaybackSettings::DESPAWN,
-        // });
         info!("Playing sound");
     }
 }
