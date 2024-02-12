@@ -1,2 +1,3 @@
 Justfile
 tile_clicker/
+.ignore
