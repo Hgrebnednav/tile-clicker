@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use super::GameState;
 use crate::despawn_screen;
 
+/// Plugin for loading assets
 pub struct LoadingPlugin;
 
 impl Plugin for LoadingPlugin {
@@ -17,15 +18,21 @@ impl Plugin for LoadingPlugin {
     }
 }
 
+/// Tag for marking entities belonging to the splash screen
+/// TODO: add logo/icon during startup to not have this being useless
 #[derive(Component)]
 struct OnSplashScreen;
 
+/// List of assets to track the loading state
 #[derive(Debug, Default, Resource)]
 pub struct AssetsLoading(pub Vec<UntypedHandle>);
 
+/// Timer to specify minimum splash screen display time
 #[derive(Resource)]
 struct SplashTimer(Timer);
 
+/// All assets used in the game.
+/// Keep assets loaded to not reload them during runtime
 #[derive(Resource)]
 pub struct Assets {
     pub font: Handle<Font>,
@@ -33,6 +40,7 @@ pub struct Assets {
     pub error: Handle<AudioSource>,
 }
 
+/// Setup splash screen and start loading assets
 fn splash_setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -77,6 +85,7 @@ fn splash_setup(
     commands.insert_resource(SplashTimer(Timer::from_seconds(1.0, TimerMode::Once)));
 }
 
+/// Check when the assets are ready and transition state
 fn check_assets_ready(
     mut commands: Commands,
     server: Res<AssetServer>,
@@ -102,7 +111,6 @@ fn check_assets_ready(
         }
     }
     timer.0.tick(time.delta());
-    debug!("Splash timer: {:?}", timer.0);
     if ready_count == loading.0.len() && timer.0.finished() {
         info!("Finished loading");
         commands.remove_resource::<AssetsLoading>();

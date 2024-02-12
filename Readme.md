@@ -1,5 +1,6 @@
 # Tile clicking game
 Click the black tiles when they appear.
+Try to click as many tiles as possible in 30 seconds.
 
 Game made with Bevy game engine.
 

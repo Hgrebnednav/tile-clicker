@@ -1,6 +1,7 @@
 use bevy::input::touch::TouchPhase;
 use bevy::{prelude::*, window::PrimaryWindow};
 
+/// Plugin which convert input clicks to a tile clicked event
 pub struct InputPlugin<S> {
     state: S,
     size: UVec2,
@@ -8,6 +9,7 @@ pub struct InputPlugin<S> {
 }
 
 impl<S> InputPlugin<S> {
+    /// Create a new instance of the plugin with the region where the tiles are located.
     pub fn new(state: S, size: UVec2, top_left: Vec2, bottom_right: Vec2) -> Self {
         Self {
             state,
@@ -36,29 +38,35 @@ where
     }
 }
 
+/// The grid settings
 #[derive(Debug, Resource)]
 struct Grid {
     size: UVec2,
     field: (Vec2, Vec2),
 }
 
+/// Event with clicked tile positions
 #[derive(Debug, Event)]
 pub struct ClickEvent {
     pub tile_x: u16,
     pub tile_y: u16,
 }
 
+/// Delay to prevent click events being send for 0.4s after the game stars
 #[derive(Debug, Resource)]
 struct ClickDelay(Timer);
 
+/// Setup plugin resources
 fn setup(mut commands: Commands) {
     commands.insert_resource(ClickDelay(Timer::from_seconds(0.4, TimerMode::Once)));
 }
 
+/// Update time of the [`ClickDelay`] resource
 fn update_time(time: Res<Time<Real>>, mut delay: ResMut<ClickDelay>) {
     delay.0.tick(time.delta());
 }
 
+/// Convert a world position to an [`ClickEvent`] if the click is inside the region
 fn to_tile_pos(grid: &Grid, world_pos: Vec2) -> Option<ClickEvent> {
     let field_width = grid.field.1.x - grid.field.0.x;
     let field_height = grid.field.1.y - grid.field.0.y;
@@ -79,6 +87,8 @@ fn to_tile_pos(grid: &Grid, world_pos: Vec2) -> Option<ClickEvent> {
     })
 }
 
+/// Handle mouse clicks
+/// Convert screen position to a tile position
 fn handle_click_input(
     mouse_btn: Res<Input<MouseButton>>,
     windows: Query<&Window, With<PrimaryWindow>>,
@@ -124,6 +134,9 @@ fn handle_click_input(
     }
 }
 
+/// Handle touch inputs
+/// Convert screen position to a tile position
+/// TODO: Does this work? It does not work in WASM
 fn handle_touch_input(
     mut touches: EventReader<TouchInput>,
     windows: Query<&Window, With<PrimaryWindow>>,

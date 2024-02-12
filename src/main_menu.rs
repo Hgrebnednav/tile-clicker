@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::despawn_screen;
-use crate::game::GameState;
+use crate::game::{GameState, Assets};
 
 pub const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 pub const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
@@ -17,19 +17,23 @@ impl Plugin for MainMenuPlugin {
     }
 }
 
+/// Tag for indicating entities wich belong the the main menu screen
 #[derive(Debug, Component)]
 pub struct OnMainMenu;
 
+/// Buttons in the menu
 #[derive(Debug, Clone, Copy, Component)]
 enum Button {
     Start,
 }
 
 impl Button {
+    /// All buttons to be displayed in the menu
     const ALL: &'static [Self] = &[Button::Start];
 }
 
-fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
+/// Create the menu
+fn setup_main_menu(mut commands: Commands, assets: Res<Assets>) {
     commands.spawn(Camera2dBundle::default()).insert(OnMainMenu);
 
     commands
@@ -70,7 +74,7 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
                             .spawn(TextBundle::from_section(
                                 format!("{:?}", button),
                                 TextStyle {
-                                    font: asset_server.load("fonts/EBGaramond-Regular.ttf"),
+                                    font: assets.font.clone(),
                                     font_size: 40.0,
                                     color: Color::rgb(0.9, 0.9, 0.9),
                                 },
@@ -81,6 +85,7 @@ fn setup_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
         });
 }
 
+/// Handle the menu buttons
 #[allow(clippy::type_complexity)]
 fn button_system(
     mut interaction_query: Query<
