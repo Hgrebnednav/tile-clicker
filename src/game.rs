@@ -358,15 +358,14 @@ fn setup_menu(mut commands: Commands, assets: Res<Assets>) {
                     })
                     .insert(*button)
                     .with_children(|parent| {
-                        parent
-                            .spawn(TextBundle::from_section(
-                                format!("{:?}", button),
-                                TextStyle {
-                                    font: assets.font.clone(),
-                                    font_size: 40.0,
-                                    color: Color::rgb(0.9, 0.9, 0.9),
-                                },
-                            ));
+                        parent.spawn(TextBundle::from_section(
+                            format!("{:?}", button),
+                            TextStyle {
+                                font: assets.font.clone(),
+                                font_size: 40.0,
+                                color: Color::rgb(0.9, 0.9, 0.9),
+                            },
+                        ));
                     });
             }
         });
@@ -563,7 +562,7 @@ fn update_game_time(
     let elapsed = stopwatch.0.elapsed_secs();
     // t_r(t) = a t² + b
     // t_r(0) = 1 => b = 1
-    // t_r(max) = 3 => a = (3-1)/max² 
+    // t_r(max) = 3 => a = (3-1)/max²
     let relative_speed = (2.0 / GAME_DURATION.powi(2)) * elapsed.powi(2) + 1.0;
     time.set_relative_speed(relative_speed);
     //time.set_relative_speed(1.0 + stopwatch.0.elapsed_secs() / GAME_DURATION);
