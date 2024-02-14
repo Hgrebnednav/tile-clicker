@@ -186,12 +186,14 @@ struct Grid<const X: usize, const Y: usize> {
 
 impl<const X: usize, const Y: usize> std::ops::Index<[usize; 2]> for Grid<X, Y> {
     type Output = Option<(Entity, Timer)>;
+    /// Get reference to tile at [y, x] on grid
     fn index(&self, index: [usize; 2]) -> &Self::Output {
         &self.tiles[index[0]][index[1]]
     }
 }
 
 impl<const X: usize, const Y: usize> std::ops::IndexMut<[usize; 2]> for Grid<X, Y> {
+    /// Get mutable reference to tile at [y, x] on grid
     fn index_mut(&mut self, index: [usize; 2]) -> &mut Self::Output {
         &mut self.tiles[index[0]][index[1]]
     }
@@ -209,6 +211,11 @@ impl<const X: usize, const Y: usize> Grid<X, Y> {
         let x = x.min(X - 1);
         let y = y.min(Y - 1);
         self.tiles[y][x] = Some((entity, Timer::from_seconds(5.0, TimerMode::Once)));
+    }
+
+    /// Check if a tile is free
+    fn is_free(&self, x: usize, y: usize) -> bool {
+        self.tiles[y][x].is_none()
     }
 
     /// Remove a tile from the grid.
@@ -350,8 +357,6 @@ fn setup_menu(mut commands: Commands, assets: Res<Assets>) {
                         ..default()
                     })
                     .insert(*button)
-                    .insert(OnGameScreen)
-                    .insert(OnSessionScreen)
                     .with_children(|parent| {
                         parent
                             .spawn(TextBundle::from_section(
@@ -361,9 +366,7 @@ fn setup_menu(mut commands: Commands, assets: Res<Assets>) {
                                     font_size: 40.0,
                                     color: Color::rgb(0.9, 0.9, 0.9),
                                 },
-                            ))
-                            .insert(OnSessionScreen)
-                            .insert(OnGameScreen);
+                            ));
                     });
             }
         });
@@ -426,7 +429,8 @@ fn spawn_tile(
         match e {
             SpawnNewEvent::Normal => {
                 let color = Color::rgb(0.1, 0.1, 0.1);
-                loop {
+                // Increase spawn check radius when failing to find a new space.
+                for extra_range in 0.. {
                     if tiles.is_full() {
                         break;
                     }
@@ -434,8 +438,8 @@ fn spawn_tile(
                     let y = rng.gen_range(0..TILE_NUM_Y);
                     let dx = x as isize - last_spawn.0.x as isize;
                     let dy = y as isize - last_spawn.0.y as isize;
-                    let dx = dx.abs().min(SPAWN_DISTANCE) * dx.signum();
-                    let dy = dy.abs().min(SPAWN_DISTANCE) * dy.signum();
+                    let dx = dx.abs().min(SPAWN_DISTANCE + extra_range / 2) * dx.signum();
+                    let dy = dy.abs().min(SPAWN_DISTANCE + extra_range / 2) * dy.signum();
                     // Limit the distance of new spawned tiles from the last spawned tile
                     let x = (last_spawn.0.x as usize)
                         .saturating_add_signed(dx)
@@ -447,7 +451,7 @@ fn spawn_tile(
                     if pos == last_spawn.0 {
                         continue;
                     }
-                    if tiles[[x, y]].is_none() {
+                    if tiles.is_free(x, y) {
                         let entity = tile::<OnSessionScreen>(&mut commands, pos.extend(1), color);
                         last_spawn.0 = pos;
                         tiles.set(x, y, entity);
@@ -527,7 +531,6 @@ fn play_sound(mut commands: Commands, assets: Res<Assets>, mut events: EventRead
             source: audio,
             settings: PlaybackSettings::DESPAWN,
         });
-        info!("Playing sound");
     }
 }
 
@@ -557,7 +560,13 @@ fn update_game_time(
 ) {
     stopwatch.0.tick(real_time.delta());
     spawn_time.0.tick(time.delta());
-    time.set_relative_speed(1.0 + stopwatch.0.elapsed_secs() / GAME_DURATION);
+    let elapsed = stopwatch.0.elapsed_secs();
+    // t_r(t) = a t² + b
+    // t_r(0) = 1 => b = 1
+    // t_r(max) = 3 => a = (3-1)/max² 
+    let relative_speed = (2.0 / GAME_DURATION.powi(2)) * elapsed.powi(2) + 1.0;
+    time.set_relative_speed(relative_speed);
+    //time.set_relative_speed(1.0 + stopwatch.0.elapsed_secs() / GAME_DURATION);
     if stopwatch.0.elapsed_secs() > GAME_DURATION {
         info!("Time {} elapsed, finished", stopwatch.0.elapsed_secs());
         events.send(FinishedEvent::Finished);
