@@ -1,3 +1,4 @@
 Justfile
 tile_clicker/
 .ignore
+*.d.ts

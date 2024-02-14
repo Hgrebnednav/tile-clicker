@@ -23,19 +23,34 @@
             margin-right: auto;
             display: block;
         }
+        button {
+            padding-left: 0;
+            padding-right: 0;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
     </style>
     <title>Tile Clicker</title>
 </head>
 <body style="margin: 0px;">
-    <canvas id="tile-clicker-canvas" width="1280" height="720"></canvas>
+    <canvas id="tile-clicker-canvas" width="500" height="580">Text</canvas>
+    <button id="btn">Load game</button>
+
     <script type="module">
         import init from './target/tile_clicker.js'
 
-        init().catch((error) => {
-            if (!error.message.startsWith("Using exceptions for control flow, don't mind me. This isn't actually an error!")) {
-                throw error;
-            }
-        });
+        function openTest() {
+            document.getElementById("btn").style.display ="none";
+            console.log("Start game");
+            init().catch((error) => {
+                if (!error.message.startsWith("Using exceptions for control flow, don't mind me. This isn't actually an error!")) {
+                    throw error;
+                }
+            });
+        }
+        document.getElementById('btn').addEventListener('click', openTest);
+
     </script>
 </body>
 </html>
