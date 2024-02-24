@@ -14,7 +14,7 @@
 //! it takes (5/3)s until a tile is worth zero points.
 //! The time is decreased each frame with [`bevy::time::Time<Virtual>::delta()`].
 //!
-//! The game is over after 30s or when a clicking on an empty tile.
+//! The game is over after 30s or when clicking on an empty tile.
 
 use bevy::prelude::*;
 use bevy::window::WindowResolution;
