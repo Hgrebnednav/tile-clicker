@@ -5,7 +5,7 @@
 //! A tile spawn after a timer reaches zero or if the only tile is clicked.
 //! The timer starts with a time of 0.8s at the end of the game this becomes (0.8/3)s.
 //! This is done by modifying the relative speed of [`bevy::time::Time<Virtual>`].
-//! The relative speed is given by (2/30²)t² + 1, where t_e is the elapsed real time
+//! The relative speed is given by (2/30²)t_e² + 1, where t_e is the elapsed real time
 //! since the start of the game.
 //!
 //! Points are given when a tile is clicked in a timely manner.
