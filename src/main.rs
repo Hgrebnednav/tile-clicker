@@ -19,7 +19,7 @@
 use bevy::prelude::*;
 use bevy::window::WindowResolution;
 mod game;
-mod main_menu;
+mod ui;
 
 use game::{FIELD_SIZE_X, FIELD_SIZE_Y, SCORE_HEIGHT};
 
@@ -39,13 +39,13 @@ fn main() {
             }),
         )
         .add_plugins(game::LoadingPlugin)
-        .add_plugins(main_menu::MainMenuPlugin)
+        .add_plugins(ui::UiPlugin)
         .add_plugins(game::GamePlugin)
         .run()
 }
 
 /// Generic system that takes a component as a parameter, and will despawn all entities with that component
-fn despawn_screen<T: Component>(to_despawn: Query<Entity, With<T>>, mut commands: Commands) {
+fn despawn_on_screen<T: Component>(to_despawn: Query<Entity, With<T>>, mut commands: Commands) {
     for entity in &to_despawn {
         commands.entity(entity).despawn_recursive();
     }

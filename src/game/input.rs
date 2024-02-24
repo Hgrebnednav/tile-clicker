@@ -48,8 +48,8 @@ struct Grid {
 /// Event with clicked tile positions
 #[derive(Debug, Event)]
 pub struct ClickEvent {
-    pub tile_x: u16,
-    pub tile_y: u16,
+    pub tile_x: usize,
+    pub tile_y: usize,
 }
 
 /// Delay to prevent click events being send for 0.4s after the game stars
@@ -82,15 +82,15 @@ fn to_tile_pos(grid: &Grid, world_pos: Vec2) -> Option<ClickEvent> {
         return None;
     }
     Some(ClickEvent {
-        tile_x: scaled.x.trunc() as u16,
-        tile_y: scaled.y.trunc() as u16,
+        tile_x: scaled.x.trunc() as usize,
+        tile_y: scaled.y.trunc() as usize,
     })
 }
 
 /// Handle mouse clicks
 /// Convert screen position to a tile position
 fn handle_click_input(
-    mouse_btn: Res<Input<MouseButton>>,
+    mouse_btn: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window, With<PrimaryWindow>>,
     q_camera: Query<(&Camera, &GlobalTransform)>,
     mut event: EventWriter<ClickEvent>,

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use super::GameState;
-use crate::despawn_screen;
+use crate::despawn_on_screen;
 
 /// Plugin for loading assets
 pub struct LoadingPlugin;
@@ -14,7 +14,10 @@ impl Plugin for LoadingPlugin {
                 Update,
                 check_assets_ready.run_if(in_state(GameState::Loading)),
             )
-            .add_systems(OnExit(GameState::Loading), despawn_screen::<OnSplashScreen>);
+            .add_systems(
+                OnExit(GameState::Loading),
+                despawn_on_screen::<OnSplashScreen>,
+            );
     }
 }
 
